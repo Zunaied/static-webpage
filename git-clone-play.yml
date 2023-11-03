@@ -1,0 +1,53 @@
+-
+  name: run website using docker container
+  hosts: servers
+  become: yes
+  tasks:
+    - name: apt update
+      shell: sudo apt-get update -y
+    - name: docker install
+      shell: apt install docker.io -y
+    - name: clone repo from git
+      git:
+        repo: https://github.com/Zunaied/two-tier-flask-app.git
+        dest: /home/ubuntu/git-clone
+    - name: docker permission
+      shell: sudo chown $USER  /var/run/docker.sock
+    - name: change directory,build image and network
+      shell: cd /home/ubuntu/git-clone
+      shell: docker build -t flaskapp /home/ubuntu/git-clone
+      shell: docker network create twotier
+    - name: docker mysql container deploy
+      community.docker.docker_container:
+        name: mysql
+        image: mysql:5.7
+        ports:
+          - "3306:3306"
+        volumes:
+          - message.sql:/docker-entrypoint-initdb.d/message.sql
+          - mysql-data:/var/lib/mysql
+        networks:
+            - name: twotier
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: myDb
+          MYSQL_USER: admin
+          MYSQL_PASSWORD: admin
+    - name: docker app container deploy
+      community.docker.docker_container:
+        name: flaskapp
+        image: flaskapp:latest
+        ports:
+          - "5000:5000"
+        volumes:
+           
+          - /var/run/docker.sock:/var/run/dock.sock
+          - container-data:/data
+        networks:
+          - name: twotier
+        env: 
+          MYSQL_HOST: mysql
+          MYSQL_USER: admin
+          MYSQL_PASSWORD: admin
+          MYSQL_DB: myDb
+          
